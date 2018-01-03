@@ -9,29 +9,9 @@ from lib import plotly_utils as pyUtils
 def parseArguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', help='the csv dataset to visualize')
-    parser.add_argument('-c', '--cmap', dest='cmap', required=False, choices=pyUtils.cmaps.keys(), default='gold', help='a custom colormap choice')
+    parser.add_argument('-c', '--cmap', dest='cmap', required=False, choices=pyUtils.cmaps.keys(), default='viridis', help='a custom colormap choice')
     parser.add_argument('-l', '--lines', dest='lines', required=False, action='store_true', default=False, help='set to show lines')
     return parser.parse_args()
-
-def determineFeatureType(data):
-    pattern = {
-        'numerical':re.compile(r"[-+]?\d*\.*\d+"),
-        'date':re.compile(r"\d+[-]\d+[-]\d+")
-    }
-    types = {'missing':0, 'numerical':1, 'string':2, 'date':3}
-    tmp = np.empty_like(data, dtype=int)
-    for i in range(data.shape[0]):
-        for j in range(data.shape[1]):
-            if data[i,j] == '' or data[i,j] == 'nan':
-                tmp[i,j] = types['missing']
-            elif pattern['date'].match(data[i,j]):
-                tmp[i,j] = types['date']
-            elif pattern['numerical'].match(data[i,j]):
-                tmp[i,j] = types['numerical']
-            else:
-                tmp[i,j] = types['string']
-    return tmp, len(types)
-
 
 args = parseArguments()
 colors = pyUtils.cmaps[args.cmap]
@@ -41,7 +21,7 @@ data, labels = dataset.loadCSV(args.dataset)
 
 array_x = np.arange(data.shape[1])
 array_y = np.arange(data.shape[0])
-array_z, zmax = determineFeatureType(data)
+array_z = dataset.determineValuesType(data)
 
 missing_count_along_x = data.shape[0] - np.count_nonzero(array_z, axis=0)
 missing_count_along_y = np.count_nonzero(array_z, axis=1)
@@ -53,7 +33,7 @@ dlist = [
         y=array_y,
         z=array_z,
         zmin=0,
-        zmax=zmax-1,
+        zmax=len(dataset.types.keys())-1,
         colorscale=colorscale,
         hoverinfo="x+y",
         showscale=False,
