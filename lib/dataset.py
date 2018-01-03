@@ -2,12 +2,12 @@ import numpy as np
 import csv
 import re
 
-types = {'missing':0, 'numerical':1, 'string':2, 'date':3}
+types = {'missing':0, 'numerical':1, 'string':2, 'date':3, 'bool':4}
 pattern = {
     'numerical':re.compile(r'[-+]?\d*\.{0,1}\d*\Z'),
     'date':re.compile(r"\d+[-]\d+[-]\d+")
 }
-missing_labels = ['','nan','NaN','n/a','N/A']
+missing_labels = ['','nan','NaN','n/a','N/A'] # TODO: should get that from args, with this as default value
 
 def loadCSV(filepath, has_header=True):
     with open(filepath, 'rbU') as csvfile:
@@ -22,7 +22,7 @@ def loadCSV(filepath, has_header=True):
     return data, np.asarray(labels)
 
 def hasMissingValues(data):
-    return np.count_nonzero(data=='') > 0 or np.count_nonzero(data=='nan') > 0 or np.count_nonzero(data=='N/A') > 0
+    return np.count_nonzero(np.isin(data, missing_labels)) > 0
 
 def dropMissingData(data, return_indices=False):
     ''' remove the lines containing a missing value from the dataset
@@ -33,7 +33,6 @@ def dropMissingData(data, return_indices=False):
         return (new, np.argwhere(np.isin(data, missing_labels))) if return_indices else new
     incomplete = []
     for i in range(len(data)):
-        # if np.count_nonzero(data[i]) != nfeature: # TODO, does not handle all missing labels
         if np.count_nonzero(np.isin(data[i], missing_labels)) > 0:
             incomplete.append(i)
     new = np.delete(data, incomplete, axis=0)
@@ -49,6 +48,8 @@ def determineValuesType(data):
                 tmp[i,j] = types['date']
             elif pattern['numerical'].match(data[i,j]):
                 tmp[i,j] = types['numerical']
+            elif data[i,j].lower() in ['true','false']:
+                tmp[i,j] = types['bool']
             else:
                 tmp[i,j] = types['string']
     return tmp
@@ -69,6 +70,9 @@ def determineFeaturesType(data):
                 break
             elif pattern['numerical'].match(data[i,j]):
                 features_type.append(types['numerical'])
+                break
+            elif data[i,j].lower() in ['true','false']:
+                features_type.append(types['bool'])
                 break
             else:
                 features_type.append(types['string'])
