@@ -8,18 +8,18 @@ import os
 import json
 from lib import dataset
 from lib import plotly_utils as pyUtils
+from copy import deepcopy
 
 def parseArguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', help='the csv dataset to visualize')
     parser.add_argument('-c', '--cmap', dest='cmap', required=False, choices=pyUtils.cmaps.keys(), default='viridis', help='a custom colormap choice')
-    parser.add_argument('-l', '--lines', dest='lines', required=False, action='store_true', default=False, help='set to show lines')
+    parser.add_argument('-l', '--lines', dest='lines', required=False, action='store_true', default=False, help='set to show lines separating features')
+    parser.add_argument('-m', '--missing-labels', dest='missing_labels', nargs='+', default=['','nan','NaN','n/a','N/A'], required=False, help='the missing labels of the dataset')
     return parser.parse_args()
 
 def computeHeatmapValues(data, features_type):
-    from copy import deepcopy
     tmp = deepcopy(data)
-
     heatmap = np.empty_like(data, dtype=float)
     features = []
     for j in range(data.shape[1]):
@@ -50,9 +50,6 @@ def computeHeatmapValues(data, features_type):
 
             idxs = np.delete(np.arange(tmp.shape[0]), indices)
             for i in idxs:
-            # for i in range(tmp.shape[0]):
-            #     if i in indices: # don't touch missing values
-            #         continue
                 tmp[i,j] = str(unique.index(tmp[i,j]))
         # TODO : implement boolean
 
@@ -227,40 +224,39 @@ if args.lines is True:
     layout['shapes'] = pyUtils.makeVerticalLines(np.arange(len(array_x)+1)-0.5, y0=0, xref='x', yref='paper', color='#000000', linewidth=0.5) + \
                        pyUtils.makeHorizontalLines([-0.1,1.1], x0=0., x1=0.955, xref='paper', yref='y2', color='#000000', linewidth=0.5)
 
-updatemenus=[
-    dict(
-        buttons=[
-            dict(
-                args=['colorscale', json.dumps(pyUtils.makeColorScale(pyUtils.cmaps['viridis'])) ],
-                label='Viridis',
-                method='restyle'
-            ),
-            dict(
-                args=['colorscale', json.dumps(pyUtils.makeColorScale(pyUtils.cmaps['plasma'])) ],
-                label='Plasma',
-                method='restyle'
-            ),
-            dict(
-                args=['colorscale', json.dumps(pyUtils.makeColorScale(pyUtils.cmaps['magma'])) ],
-                label='Magma',
-                method='restyle'
-            ),
-            dict(
-                args=['colorscale', json.dumps(pyUtils.makeColorScale(pyUtils.cmaps['inferno'])) ],
-                label='Inferno',
-                method='restyle'
-            ),
-        ],
-        direction='left',
-        pad={'r':10, 't':10},
-        showactive=False,
-        x=.965,
-        y=0.15,
-        xanchor='left',
-        yanchor='top'
-    )
-]
-layout['updatemenus'] = updatemenus
+cmapDropoutList=dict(
+    buttons=[
+        dict(
+            args=['colorscale', json.dumps(pyUtils.makeColorScale(pyUtils.cmaps['viridis'])) ],
+            label='Viridis',
+            method='restyle'
+        ),
+        dict(
+            args=['colorscale', json.dumps(pyUtils.makeColorScale(pyUtils.cmaps['plasma'])) ],
+            label='Plasma',
+            method='restyle'
+        ),
+        dict(
+            args=['colorscale', json.dumps(pyUtils.makeColorScale(pyUtils.cmaps['magma'])) ],
+            label='Magma',
+            method='restyle'
+        ),
+        dict(
+            args=['colorscale', json.dumps(pyUtils.makeColorScale(pyUtils.cmaps['inferno'])) ],
+            label='Inferno',
+            method='restyle'
+        ),
+    ],
+    direction='left',
+    pad={'r':10, 't':10},
+    showactive=False,
+    x=.965,
+    y=0.15,
+    xanchor='left',
+    yanchor='top'
+)
+
+layout['updatemenus'] = [cmapDropoutList]
 
 fig = go.Figure(data=dlist, layout=layout)
 py.plot(fig, filename='csv-plot.html')
