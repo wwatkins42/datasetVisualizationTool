@@ -5,7 +5,7 @@ import re
 types = {'missing':0, 'numerical':1, 'string':2, 'date':3, 'bool':4}
 pattern = {
     'numerical':re.compile(r'[-+]?\d*\.{0,1}\d*\Z'),
-    'date':re.compile(r"\d+[-]\d+[-]\d+")
+    'date':re.compile(r"\d{4}[-]\d{2}[-]\d{2}")
 }
 missing_labels = ['','nan','NaN','n/a','N/A'] # TODO: should get that from args, with this as default value
 
@@ -38,21 +38,29 @@ def dropMissingData(data, return_indices=False):
     new = np.delete(data, incomplete, axis=0)
     return (new, incomplete) if return_indices else new
 
-def determineValuesType(data):
-    tmp = np.empty_like(data, dtype=int)
+def determineValuesType(data, return_keys=False):
+    if return_keys is True:
+        mlen = np.max([len(key) for key in types.keys()])
+        keys = np.empty_like(data, dtype='|S%d'%mlen)
+    valuesType = np.empty_like(data, dtype=int)
     for i in range(data.shape[0]):
         for j in range(data.shape[1]):
             if data[i,j] in missing_labels:
-                tmp[i,j] = types['missing']
+                valuesType[i,j] = types['missing']
+                if return_keys: keys[i,j] = 'Missing'
             elif pattern['date'].match(data[i,j]):
-                tmp[i,j] = types['date']
+                valuesType[i,j] = types['date']
+                if return_keys: keys[i,j] = 'Date'
             elif pattern['numerical'].match(data[i,j]):
-                tmp[i,j] = types['numerical']
+                valuesType[i,j] = types['numerical']
+                if return_keys: keys[i,j] = 'Numerical'
             elif data[i,j].lower() in ['true','false']:
-                tmp[i,j] = types['bool']
+                valuesType[i,j] = types['bool']
+                if return_keys: keys[i,j] = 'Boolean'
             else:
-                tmp[i,j] = types['string']
-    return tmp
+                valuesType[i,j] = types['string']
+                if return_keys: keys[i,j] = 'String'
+    return (valuesType, keys) if return_keys else valuesType
 
 def determineFeaturesType(data):
     ''' return the type of the first value (except missing) for each feature
