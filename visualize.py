@@ -68,8 +68,9 @@ data, labels = dataset.loadCSV(args.dataset)
 has_missing_values = False
 colors = pyUtils.cmaps[args.cmap]
 colorscale = pyUtils.makeColorScale(colors)
+missing_color = '#424242'
 if dataset.hasMissingValues(data) is True:
-    colorscale = pyUtils.appendColorToScale(colorscale, '#ff0000', p=0.001)
+    colorscale = pyUtils.appendColorToScale(colorscale, missing_color, p=0.001)
     has_missing_values = True
 
 array_x = np.arange(data.shape[1])
@@ -190,23 +191,23 @@ layout = go.Layout(
         zeroline=False,
         autorange='reversed'
     ),
-    xaxis2=dict(
-        domain=[0, 0.955],
-        showgrid=False,
-        ticks=False,
-        showticklabels=False,
-        zeroline=False,
-        overlaying='x',
-        fixedrange=True,
-    ),
-    yaxis2=dict(
-        domain=[0, 0.15],
-        showgrid=False,
-        showticklabels=False,
-        zeroline=False,
-        fixedrange=True,
-        autorange='reversed'
-    ),
+    # xaxis2=dict(
+    #     domain=[0, 0.955],
+    #     showgrid=False,
+    #     ticks=False,
+    #     showticklabels=False,
+    #     zeroline=False,
+    #     overlaying='x',
+    #     fixedrange=True,
+    # ),
+    # yaxis2=dict(
+    #     domain=[0, 0.15],
+    #     showgrid=False,
+    #     showticklabels=False,
+    #     zeroline=False,
+    #     fixedrange=True,
+    #     autorange='reversed'
+    # ),
     xaxis3=dict(
         title='Data<br>Completeness',
         titlefont=dict(size=11),
@@ -229,33 +230,34 @@ layout = go.Layout(
         zeroline=False,
         overlaying='y',
     ),
-    boxgroupgap=(4./data.shape[1]), # -> rescales the box plots in function of the number of features
-    # annotations=[
-    #     dict(
-    #         x=0.5,
-    #         y=-0.04,
-    #         font=dict(size=14),
-    #         xref='paper',
-    #         yref='paper',
-    #         text=os.path.basename(args.dataset),
-    #         xanchor='middle',
-    #         showarrow=False
-    #     )
-    # ]
-    annotations = pyUtils.makeHorizontallyAlignedAnnotations(
-        array_x,
-        array_x,
-        y=-0.03,
-        xref='x2',
-        yref='paper',
-        xanchor='middle'
-    )
+    # boxgroupgap=(4./data.shape[1]), # -> rescales the box plots in function of the number of features
+    annotations=[
+        dict(
+            x=0.5,
+            y=-0.04,
+            font=dict(size=14),
+            xref='paper',
+            yref='paper',
+            text=os.path.basename(args.dataset),
+            xanchor='middle',
+            showarrow=False
+        )
+    ]
+    # annotations = pyUtils.makeHorizontallyAlignedAnnotations(
+    #     array_x,
+    #     array_x,
+    #     # y=-0.03,
+    #     y=0.115,
+    #     xref='x2',
+    #     yref='paper',
+    #     xanchor='middle'
+    # )
 )
-shapes = pyUtils.makeVerticalLines(np.arange(len(array_x)+1)-0.5, y0=0, xref='x', yref='paper', color='#000000', linewidth=0.5) + \
-         pyUtils.makeHorizontalLines([-0.1,1.1], x0=0., x1=0.955, xref='paper', yref='y2', color='#000000', linewidth=0.5)
+shapes = pyUtils.makeVerticalLines(np.arange(len(array_x)+1)-0.5, y0=0.15, xref='x', yref='paper', color='#000000', linewidth=0.5) + \
+         pyUtils.makeHorizontalLines([0.15,1], x0=0., x1=0.955, xref='paper', yref='paper', color='#000000', linewidth=0.5)
 
 buttons_cmaps=dict(
-    buttons=pyUtils.makeColorscaleButtons(pyUtils.cmaps, add_missing='#ff0000' if has_missing_values else None),
+    buttons=pyUtils.makeColorscaleButtons(pyUtils.cmaps, add_missing=missing_color if has_missing_values else None),
     type='dropdown',
     direction='left',
     active=(pyUtils.cmaps.keys().index(args.cmap)),
