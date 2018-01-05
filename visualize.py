@@ -1,12 +1,12 @@
 import plotly.offline as py
 import plotly.graph_objs as go
-import plotly.figure_factory as ff
 import numpy as np
 import argparse
 import time
 import os
 import dateutil.parser
 
+from lib import utils
 from lib import dataset
 from lib import plotly_utils as pyUtils
 from copy import deepcopy
@@ -16,7 +16,6 @@ def parseArguments():
     parser.add_argument('dataset', help='the csv dataset to visualize')
     parser.add_argument('-c', '--cmap', dest='cmap', required=False, choices=pyUtils.cmaps.keys(), default='viridis', help='a custom colormap choice')
     parser.add_argument('-l', '--lines', dest='lines', required=False, action='store_true', default=False, help='set to show lines separating features')
-    parser.add_argument('-m', '--missing-labels', dest='missing_labels', nargs='+', default=['','nan','NaN','n/a','N/A'], required=False, help='the missing labels of the dataset')
     return parser.parse_args()
 
 def computeHeatmapValues(data, features_type):
@@ -41,7 +40,6 @@ def computeHeatmapValues(data, features_type):
             diff = abs(np.max(col) - np.min(col))
             features.append([diff, np.max(col)])
         else:
-            # string (TODO : could have a sort by ascii order for the strings)
             unique = list(np.unique(column))
             if len(unique) == 1:
                 features.append([1, 0])
@@ -50,7 +48,6 @@ def computeHeatmapValues(data, features_type):
             idxs = np.delete(np.arange(tmp.shape[0]), indices)
             for i in idxs:
                 tmp[i,j] = str(unique.index(tmp[i,j]))
-        # TODO : implement boolean
 
     for i in range(data.shape[0]):
         for j in range(data.shape[1]):
@@ -77,6 +74,8 @@ array_x = np.arange(data.shape[1])
 array_y = np.arange(data.shape[0])
 array_z, valuesType = dataset.determineValuesType(data, return_keys=True)
 
+missing_count_along_x = data.shape[0] - np.count_nonzero(array_z, axis=0)
+missing_count_along_x_range = [np.min(missing_count_along_x), np.max(missing_count_along_x)]
 missing_count_along_y = np.count_nonzero(array_z, axis=1)
 missing_count_along_y_range = [np.min(missing_count_along_y), np.max(missing_count_along_y)]
 
@@ -84,7 +83,8 @@ features_type = dataset.determineFeaturesType(data)
 heatmap_array = computeHeatmapValues(data, features_type)
 
 dlist = [
-    go.Heatmap( # Features repartition informations
+    #(Heatmap 1 : Features repartition)
+    go.Heatmap(
         x=array_x,
         y=array_y,
         z=heatmap_array,
@@ -102,7 +102,7 @@ dlist = [
             yanchor='bottom',
             ticks='inside',
             ticklen=5,
-            title='raw values (Feature-relative scale)',
+            title='Raw values (Feature-relative scale)',
             titleside='right',
             outlinewidth=0.5,
         ),
@@ -110,7 +110,8 @@ dlist = [
         xaxis='x',
         yaxis='y',
     ),
-    go.Heatmap( # Data type informations
+    #(Heatmap 2 : Data type)
+    go.Heatmap(
         visible=False,
         x=array_x,
         y=array_y,
@@ -130,9 +131,9 @@ dlist = [
             xanchor='left',
             yanchor='bottom',
             ticks='inside',
-            ticklen=5,
-            # dtick=0.1,
-            title='values type',
+            ticklen=0,
+            showticklabels=False,
+            title='Values type (Missing, Numerical, String, Date, Boolean)',
             titleside='right',
             outlinewidth=0.5,
         ),
@@ -141,6 +142,7 @@ dlist = [
         xaxis='x',
         yaxis='y',
     ),
+    #(Data Completeness plot)
     go.Scatter(
         x=missing_count_along_y,
         y=array_y,
@@ -152,26 +154,39 @@ dlist = [
             'width':1
         },
         mode='lines',
+        xaxis='x2',
+        yaxis='y2',
+    ),
+    #(xaxis missing values labels)
+    go.Scatter(
+        x=array_x,
+        y=np.zeros_like(array_x),
+        text=missing_count_along_x,
+        hoverinfo="skip",
+        showlegend=False,
+        mode='lines',
         xaxis='x3',
         yaxis='y3',
     ),
-]# + pyUtils.makeBoxPlots(data, labels, features_type, axis=2, normed=True)
+    #(xaxis missing values labels 2)
+    go.Scatter(
+        x=array_x,
+        y=np.zeros_like(array_x),
+        text=missing_count_along_x,
+        hoverinfo="skip",
+        showlegend=False,
+        mode='lines',
+        xaxis='x4',
+        yaxis='y4',
+    ),
+]# + pyUtils.makeBoxPlots(data, labels, features_type, axis=0, visible=False, normed=False)
 
 
 layout = go.Layout(
     # font=dict(family='Balto', size=11, color='#2f2f2f'),
-    margin=dict(
-        l=60,
-        r=80,
-        t=90,
-        b=30
-    ),
-    legend=dict(
-        x=-0.015,
-        y=-0.075,
-        orientation="h",
-        traceorder='normal'
-    ),
+    margin=dict(l=60,r=80,t=90,b=30),
+
+    #(Axes main plot)
     xaxis=dict(
         domain=[0, 0.955],
         tickangle=20,
@@ -191,24 +206,8 @@ layout = go.Layout(
         zeroline=False,
         autorange='reversed'
     ),
-    # xaxis2=dict(
-    #     domain=[0, 0.955],
-    #     showgrid=False,
-    #     ticks=False,
-    #     showticklabels=False,
-    #     zeroline=False,
-    #     overlaying='x',
-    #     fixedrange=True,
-    # ),
-    # yaxis2=dict(
-    #     domain=[0, 0.15],
-    #     showgrid=False,
-    #     showticklabels=False,
-    #     zeroline=False,
-    #     fixedrange=True,
-    #     autorange='reversed'
-    # ),
-    xaxis3=dict(
+    #(Axes Data Completeness)
+    xaxis2=dict(
         title='Data<br>Completeness',
         titlefont=dict(size=11),
         tickfont=dict(size=11),
@@ -222,7 +221,7 @@ layout = go.Layout(
         fixedrange=True,
         side="top",
     ),
-    yaxis3=dict(
+    yaxis2=dict(
         autorange=False,
         range=[data.shape[0]-0.5, -0.5],
         showgrid=False,
@@ -230,45 +229,85 @@ layout = go.Layout(
         zeroline=False,
         overlaying='y',
     ),
+    #(Axes missing values labels)
+    xaxis3=dict(
+        tickfont=dict(size=10,color='#505050'),
+        range=[-0.5, data.shape[1]-0.5],
+        tickvals=np.arange(len(missing_count_along_x))[0::2],
+        ticktext=missing_count_along_x[0::2],
+        ticklen=1,
+        tickwidth=3,
+        showgrid=False,
+        zeroline=False,
+        fixedrange=True,
+        overlaying='x',
+    ),
+    yaxis3=dict(
+        domain=[0.13, 0.15],
+        range=[1, 2],
+        showticklabels=False,
+        showgrid=False,
+        zeroline=False,
+        fixedrange=True,
+    ),
+    #(Axes missing values labels 2)
+    xaxis4=dict(
+        title='Missing values (per feature)',
+        titlefont=dict(size=11,color='#505050',),
+        tickfont=dict(size=10,color='#505050'),
+        tickcolor='#b0b0b0',
+        range=[-0.5, data.shape[1]-0.5],
+        tickvals=np.arange(len(missing_count_along_x))[1::2],
+        ticktext=missing_count_along_x[1::2],
+        ticklen=15,
+        showgrid=False,
+        zeroline=False,
+        fixedrange=True,
+        overlaying='x',
+    ),
+    yaxis4=dict(
+        domain=[0.12, 0.13],
+        range=[1, 2],
+        showticklabels=False,
+        showgrid=False,
+        zeroline=False,
+        fixedrange=True,
+    ),
+
+    #(Title, which is the name of the file)
+    # annotations=[
+    #     dict(
+    #         x=0.5,
+    #         y=-0.02,
+    #         font=dict(size=14),
+    #         xref='paper',
+    #         yref='paper',
+    #         text=os.path.basename(args.dataset),
+    #         xanchor='middle',
+    #         showarrow=False
+    #     )
+    # ]
     # boxgroupgap=(4./data.shape[1]), # -> rescales the box plots in function of the number of features
-    annotations=[
-        dict(
-            x=0.5,
-            y=-0.04,
-            font=dict(size=14),
-            xref='paper',
-            yref='paper',
-            text=os.path.basename(args.dataset),
-            xanchor='middle',
-            showarrow=False
-        )
-    ]
-    # annotations = pyUtils.makeHorizontallyAlignedAnnotations(
-    #     array_x,
-    #     array_x,
-    #     # y=-0.03,
-    #     y=0.115,
-    #     xref='x2',
-    #     yref='paper',
-    #     xanchor='middle'
-    # )
 )
+#(Lines on main plot)
 shapes = pyUtils.makeVerticalLines(np.arange(len(array_x)+1)-0.5, y0=0.15, xref='x', yref='paper', color='#000000', linewidth=0.5) + \
          pyUtils.makeHorizontalLines([0.15,1], x0=0., x1=0.955, xref='paper', yref='paper', color='#000000', linewidth=0.5)
 
+#(Dropdown menu for color map choices)
 buttons_cmaps=dict(
     buttons=pyUtils.makeColorscaleButtons(pyUtils.cmaps, add_missing=missing_color if has_missing_values else None),
     type='dropdown',
     direction='left',
     active=(pyUtils.cmaps.keys().index(args.cmap)),
-    pad={'r':4, 't':4},
-    showactive=False,
-    x=.965,
-    y=0.15,
+    pad={'t':7},
+    showactive=True,
+    x=.96,
+    y=0.04,
     xanchor='left',
     yanchor='top',
     borderwidth=0.5,
 )
+#(Buttons to show/hide lines)
 buttons_lines=dict(
     buttons=[
         dict(
@@ -286,13 +325,14 @@ buttons_lines=dict(
     direction='right',
     active=(1 if args.lines else 0),
     showactive=True,
-    pad={'r':4, 't':4},
-    x=.965,
-    y=0.04,
+    pad={'t':8},
+    x=.96,
+    y=0.15,
     xanchor='left',
     yanchor='top',
     borderwidth=0.5
 )
+#(Dropdown menu to select the plot to display)
 buttons_plot=dict(
     buttons=[
         dict(
@@ -310,17 +350,17 @@ buttons_plot=dict(
     direction='left',
     active=0,
     showactive=True,
-    x=.965,
+    pad={'t':4},
+    x=0.96,
     y=0.09,
     xanchor='left',
     yanchor='top',
     borderwidth=0.5
 )
-
 layout['updatemenus'] = [buttons_cmaps, buttons_lines, buttons_plot]
 
 if args.lines is True:
     layout['shapes'] = shapes
 
 fig = go.Figure(data=dlist, layout=layout)
-py.plot(fig, filename='csv-plot.html')
+py.plot(fig, filename='csv-plot.html', show_link=False)
