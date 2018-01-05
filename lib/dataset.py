@@ -1,25 +1,33 @@
 import numpy as np
 import csv
-import re
+import utils
 
 types = {'missing':0, 'numerical':1, 'string':2, 'date':3, 'bool':4}
-pattern = {
-    'numerical':re.compile(r'[-+]?\d*\.{0,1}\d*\Z'),
-    'date':re.compile(r"\d{4}[-]\d{2}[-]\d{2}")
-}
-missing_labels = ['','nan','NaN','n/a','N/A'] # TODO: should get that from args, with this as default value
+missing_labels = ['','nan','NaN','n/a','N/A','NA']
 
 def loadCSV(filepath, has_header=True):
     with open(filepath, 'rbU') as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
+        has_header = hasHeader(csvfile)
         data = []
         for i, row in  enumerate(reader):
             if i == 0 and has_header: labels = row; continue
             data.append(row)
     data = np.asarray(data)
     if has_header is False:
-        labels = ["feature-%d"%i for i in range(data.shape[1])] # TODO: find a way to check if header is missing automatically
+        labels = ["feature-%d"%i for i in range(data.shape[1])]
     return data, np.asarray(labels)
+
+def hasHeader(csvfile):
+    ''' check if csvfile has an header with sniffer. In case it does not
+        know, return True
+    '''
+    try:
+        has_header = csv.Sniffer().has_header(csvfile.read(2048))
+    except:
+        has_header = True
+    csvfile.seek(0)
+    return has_header
 
 def hasMissingValues(data):
     return np.count_nonzero(np.isin(data, missing_labels)) > 0
@@ -48,15 +56,15 @@ def determineValuesType(data, return_keys=False):
             if data[i,j] in missing_labels:
                 valuesType[i,j] = types['missing']
                 if return_keys: keys[i,j] = 'Missing'
-            elif pattern['date'].match(data[i,j]):
-                valuesType[i,j] = types['date']
-                if return_keys: keys[i,j] = 'Date'
-            elif pattern['numerical'].match(data[i,j]):
+            elif utils.isFloat(data[i,j]):
                 valuesType[i,j] = types['numerical']
                 if return_keys: keys[i,j] = 'Numerical'
             elif data[i,j].lower() in ['true','false']:
                 valuesType[i,j] = types['bool']
                 if return_keys: keys[i,j] = 'Boolean'
+            elif utils.isDate(data[i,j]):
+                valuesType[i,j] = types['date']
+                if return_keys: keys[i,j] = 'Date'
             else:
                 valuesType[i,j] = types['string']
                 if return_keys: keys[i,j] = 'String'
@@ -73,14 +81,14 @@ def determineFeaturesType(data):
                     features_type.append(types['missing'])
                     break
                 continue
-            elif pattern['date'].match(data[i,j]):
-                features_type.append(types['date'])
-                break
-            elif pattern['numerical'].match(data[i,j]):
+            elif utils.isFloat(data[i,j]):
                 features_type.append(types['numerical'])
                 break
             elif data[i,j].lower() in ['true','false']:
                 features_type.append(types['bool'])
+                break
+            elif utils.isDate(data[i,j]):
+                features_type.append(types['date'])
                 break
             else:
                 features_type.append(types['string'])
