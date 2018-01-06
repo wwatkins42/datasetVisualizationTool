@@ -3,6 +3,7 @@ import csv
 import utils
 
 types = {'missing':0, 'numerical':1, 'string':2, 'date':3, 'bool':4}
+labels= {0:'missing', 1:'numerical', 2:'string', 3:'date', 4:'bool'}
 missing_labels = ['','nan','NaN','n/a','N/A','NA']
 
 def loadCSV(filepath, has_header=True):
@@ -31,6 +32,12 @@ def hasHeader(csvfile):
 
 def hasMissingValues(data):
     return np.count_nonzero(np.isin(data, missing_labels)) > 0
+
+def centeredNormalization(data):
+    # mean centering + std normalization
+    data -= np.mean(data)
+    data /= np.std(data)
+    return data
 
 def dropMissingData(data, return_indices=False):
     ''' remove the lines containing a missing value from the dataset

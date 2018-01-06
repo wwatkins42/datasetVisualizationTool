@@ -21,43 +21,41 @@ def parseArguments():
 def computeHeatmapValues(data, features_type):
     tmp = deepcopy(data)
     heatmap = np.empty_like(data, dtype=float)
-    features = []
+
     for j in range(data.shape[1]):
         column, indices = dataset.dropMissingData(data[:,j], return_indices=True)
         if features_type[j] == dataset.types['missing']:
-            features.append(None)
+            vals = None
         elif features_type[j] == dataset.types['numerical']:
             column = column.astype(float)
-            diff = abs(np.max(column) - np.min(column))
-            if diff == 0:
-                diff = 1.
-            features.append([diff, np.max(column)])
+            m = np.max(column)
+            d = (m - np.min(column))
+            vals = [(1 if d==0 else d), m]
         elif features_type[j] == dataset.types['date']:
-            for i in range(tmp.shape[0]):
-                date = dateutil.parser.parse(column[i]).timetuple()
-                tmp[i,j] = str(time.mktime(date))
-            col = tmp[:,j].astype(float)
-            diff = abs(np.max(col) - np.min(col))
-            features.append([diff, np.max(col)])
+            idxs = np.delete(np.arange(tmp.shape[0]), indices)
+            for i in idxs:
+                tmp[i,j] = str(time.mktime(dateutil.parser.parse(tmp[i,j]).timetuple()))
+            col = tmp[idxs,j].astype(float)
+            m = np.max(col)
+            d = (m - np.min(col))
+            vals = [d, m]
         else:
             unique = list(np.unique(column))
-            if len(unique) == 1:
-                features.append([1, 0])
-            else:
-                features.append([len(unique)-1, len(unique)-1])
+            lu = len(unique)
+            vals = ([1,0] if lu==1 else [lu-1, lu-1])
             idxs = np.delete(np.arange(tmp.shape[0]), indices)
             for i in idxs:
                 tmp[i,j] = str(unique.index(tmp[i,j]))
 
-    for i in range(data.shape[0]):
-        for j in range(data.shape[1]):
+        for i in range(data.shape[0]):
             try:
                 point = tmp[i,j].astype(float)
-                point = (point - features[j][1]) / features[j][0] + 1.
+                point = (point - vals[1]) / vals[0] + 1.
             except:
                 point = 1.001
             heatmap[i,j] = point
     return heatmap
+
 
 args = parseArguments()
 data, labels = dataset.loadCSV(args.dataset)
@@ -72,14 +70,20 @@ if dataset.hasMissingValues(data) is True:
 
 array_x = np.arange(data.shape[1])
 array_y = np.arange(data.shape[0])
-array_z, valuesType = dataset.determineValuesType(data, return_keys=True)
+
+# Compute the data type
+features_type = dataset.determineFeaturesType(data)
+array_z = np.ones_like(data, dtype=float)
+for j in range(data.shape[1]):
+    array_z[:,j] = features_type[j]
+array_z[np.isin(data, dataset.missing_labels)] = 0
+valuesType = ([[dataset.labels[array_z[i,j]] for j in range(data.shape[1])] for i in range(data.shape[0])])
 
 missing_count_along_x = data.shape[0] - np.count_nonzero(array_z, axis=0)
 missing_count_along_x_range = [np.min(missing_count_along_x), np.max(missing_count_along_x)]
 missing_count_along_y = np.count_nonzero(array_z, axis=1)
 missing_count_along_y_range = [np.min(missing_count_along_y), np.max(missing_count_along_y)]
 
-features_type = dataset.determineFeaturesType(data)
 heatmap_array = computeHeatmapValues(data, features_type)
 
 dlist = [
