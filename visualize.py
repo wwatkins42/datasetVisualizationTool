@@ -14,9 +14,13 @@ from copy import deepcopy
 def parseArguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', help='the csv dataset to visualize')
+    parser.add_argument('-s', '--sort', dest='sort', required=False, default=None, help='sort by feature name (could pass a list), ex: --sort Level,Login,Coalition')
     parser.add_argument('-c', '--cmap', dest='cmap', required=False, choices=pyUtils.cmaps.keys(), default='viridis', help='a custom colormap choice')
     parser.add_argument('-l', '--lines', dest='lines', required=False, action='store_true', default=False, help='set to show lines separating features')
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.sort is not None:
+        args.sort = args.sort.split(',')
+    return args
 
 def computeHeatmapValues(data, features_type):
     tmp = deepcopy(data)
@@ -85,6 +89,20 @@ missing_count_along_y = np.count_nonzero(array_z, axis=1)
 missing_count_along_y_range = [np.min(missing_count_along_y), np.max(missing_count_along_y)]
 
 heatmap_array = computeHeatmapValues(data, features_type)
+
+# sort with arg --sort [label]
+def sortHeatmapDataByLabel(label, data, heatmap_array):
+    idx = list(labels).index(label)
+    axis = 1
+    heatmap_array = np.insert(heatmap_array, 0, np.arange(heatmap_array.shape[0]), axis=axis)
+    heatmap_array = np.asarray(sorted(heatmap_array, key=lambda x:x[idx+1], reverse=True))
+    indices = np.asarray(heatmap_array[:,0], dtype=int)
+    data = data[indices]
+    heatmap_array = np.delete(heatmap_array, 0, axis=axis)
+    return data, heatmap_array
+
+if args.sort is not None and args.sort[0] in list(labels):
+    data, heatmap_array = sortHeatmapDataByLabel(args.sort[0], data, heatmap_array)
 
 dlist = [
     #(Heatmap 1 : Features repartition)
@@ -361,7 +379,35 @@ buttons_plot=dict(
     yanchor='top',
     borderwidth=0.5
 )
-layout['updatemenus'] = [buttons_cmaps, buttons_lines, buttons_plot]
+
+def createSortByLabelsButtonsDicts(labels):
+    dicts = []
+    for label in labels:
+        data_tmp, heatmap_array_tmp = sortHeatmapDataByLabel(label, deepcopy(data), deepcopy(heatmap_array))
+        dicts.append(dict(
+            args=[{'z':[heatmap_array_tmp, array_z], 'text':[data_tmp, valuesType, None, missing_count_along_x, missing_count_along_x]}],
+            label=label,
+            method='restyle'
+        ))
+    return dicts
+
+if args.sort is not None and len(args.sort) > 1:
+    buttons_sort=dict(
+        buttons=createSortByLabelsButtonsDicts(args.sort),
+        type='dropdown',
+        direction='right',
+        active=0,
+        showactive=True,
+        pad={'t':4},
+        x=0.,
+        y=0.09,
+        xanchor='left',
+        yanchor='top',
+        borderwidth=0.5
+    )
+    layout['updatemenus'] = [buttons_cmaps, buttons_lines, buttons_plot, buttons_sort]
+else:
+    layout['updatemenus'] = [buttons_cmaps, buttons_lines, buttons_plot]
 
 if args.lines is True:
     layout['shapes'] = shapes
